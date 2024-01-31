@@ -5,14 +5,20 @@ https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/YoutubeDL.py
 https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/downloader/common.py
 '''
 
-startDate = '20240123'          #값 변경 뒤에는 path_videoList 폴더를 삭제
+startDate = '20240128'          #값 변경 뒤에는 path_videoList 폴더를 삭제
 periodDownloadComments = 3
 
-number_of_process = 16
+number_of_process = 8
 
 path_data = './data'
+
+#pathes for channel
 path_videoList = './data/videoList'
 path_followerCount = './data/followerCount'
+
+#pathes for video
+path_metadata = './data/metadata'
+path_detail = './data/detail'
 path_thumbnail = './data/thumbnail'
 path_comment = './data/comment'
 
