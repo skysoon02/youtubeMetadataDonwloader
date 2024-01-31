@@ -3,109 +3,71 @@ from VideoListDownloader import VideoListDownloader
 from VideoDownloader import VideoDownloader
 
 import os
-import argparse
-from multiprocessing import Process, Queue
+from multiprocessing import Pool
 from datetime import datetime, timedelta
 
-import pymysql
-from sqlalchemy import create_engine
-from sshtunnel import SSHTunnelForwarder
 
-import pandas as pd
+def init():
+    if not os.path.isdir(path_data):
+        os.makedirs(path_data)
+    if not os.path.isdir(path_videoList):
+        os.makedirs(path_videoList)
+    if not os.path.isdir(path_followerCount):
+        os.makedirs(path_followerCount)
+    if not os.path.isdir(path_thumbnail):
+        os.makedirs(path_thumbnail)
+    if not os.path.isdir(path_comment):
+        os.makedirs(path_comment)
+
+def worker_VideoListDownloader(channel):
+    videoListDownloader = VideoListDownloader(channel)
+    videoListDownloader.download()
+    videoListDownloader.followerCountDownload()
+    print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
+    print('Successfully downloaded video URLs: {0}'.format(channel['name']))
 
 
-def get_DB(DB_NAME):
-    with SSHTunnelForwarder(
-        (DB_ENV['SSH_HOST'], DB_ENV['SSH_PORT']),
-        ssh_username=DB_ENV['SSH_USER'],
-        ssh_password=DB_ENV['SSH_PASSWORD'],
-        remote_bind_address=(DB_ENV['HOST'], DB_ENV['PORT'])
-    ) as tunnel:
-        with pymysql.connect(
-            host='127.0.0.1', # tunnel.local_bind_host,
-            port=tunnel.local_bind_port,
-            user=DB_ENV['USER'],
-            password=DB_ENV['PASSWORD'],
-            database=DB_ENV['DATABASE'],
-            charset='utf8mb4'
-        ) as conn:
-            with conn.cursor() as cur:
-                DB_TABLE = pd.read_sql(f'SELECT * FROM {DB_NAME};', conn)
-                
-    return DB_TABLE
+def debug():
+    pass
 
-def filter_channel_id(df, channel_id_column_name, channel_id_lst):
-    return df[df[channel_id_column_name].isin(channel_id_lst)].reset_index(drop=True)
 
-def main(args):    
-    comment_flag = False
+def main():
+    init()
     lastDownloadTime = None
-    
-    c_id_lst = args.channel_id_lst
-    ORI_CHANNEL_TABLE = get_DB('CHANNEL_TABLE')
-    CHANNEL_TABLE = filter_channel_id(ORI_CHANNEL_TABLE, 'ID', c_id_lst)
-    
+
     while True:
-        CONTENT_TABLE = get_DB('CONTENT_TABLE')
-        CONTENT_REVISED_TABLE = get_DB('CONTENT_REVISED_TABLE')
-        CHANNEL_FOLLOWER_CNT_TABLE = get_DB('CHANNEL_FOLLOWER_CNT_TABLE')
-        VIDEO_URL_TABLE = filter_channel_id(get_DB('VIDEO_URL_TABLE'), 'CHANNEL_TABLE_ID', c_id_lst)
-        
         ### (1) Download new video URLs of channels
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
-        print('### Start downloading video URLs\n')
+        print('Start downloading video URLs\n')
         
-        processes = []
-        for i, row in CHANNEL_TABLE.iterrows():
-            videoListDownloader = VideoListDownloader({
-                'flag': i == 0,  'id': row.ID, 'name': row.CHANNEL_NAME, 'URL': row.CHANNEL_URL, 
-                'CHANNEL_TABLE': CHANNEL_TABLE, 'ORI_CHANNEL_TABLE': ORI_CHANNEL_TABLE, 
-                'VIDEO_URL_TABLE': VIDEO_URL_TABLE, 'CHANNEL_FOLLOWER_CNT_TABLE': CHANNEL_FOLLOWER_CNT_TABLE
-            })
-            
-            process = Process(target=videoListDownloader.download)
-            process.start()
-            processes.append(process)
-
-        for process in processes:
-            process.join()
+        with Pool(number_of_process) as pool:
+            pool.map(worker_VideoListDownloader, channels)
             
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
-        print('### Done downloading video URLs\n')
+        print('Successfully downloaded all video URLs\n')
 
+        return
         ### (2) Download videos' metadatas and thumbnails
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
-        print('### Start downloading video metadatas\n')
-        
-        toDownloadVideoURLs = list(VIDEO_URL_TABLE['YOUTUBE_URL'])
+        print('Start downloading video metadatas\n')
+
+        toDownloadVideoURLs = []    #여러 *.txt 파일의 URL 전부 읽기
+        for channel in channels:
+            path = path_videoList + '/videoList_' + channel['name'] + '.tsv'
+            f = open(path, 'r')
+            lines = f.readlines()
+            for line in lines:
+                toDownloadVideoURLs.append(line.split('\t')[0])
         
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         print('The number of entire URLs: {0}'.format(len(toDownloadVideoURLs)))
 
-        que = Queue()   #URL들을 chunK_size로 나눠서 프로세스 큐에 넣기
-        for i in range(number_of_process):            
-            que.put(toDownloadVideoURLs[
-                i*len(toDownloadVideoURLs)//number_of_process : 
-                (i+1)*len(toDownloadVideoURLs)//number_of_process
-            ])
-
-        processes = []
-        for i in range(number_of_process):
-            videoDownloader = VideoDownloader({
-                'CONTENT_TABLE': CONTENT_TABLE, 
-                'CONTENT_REVISED_TABLE': CONTENT_REVISED_TABLE
-            })
-            
-            process = Process(target=videoDownloader.download, args=(que, ))
-            processes.append(process)
-            process.start()
-
-        for process in processes:
-            process.join()
-        que.close()
+        videoDownloader = VideoDownloader()
+        with Pool(number_of_process) as pool:
+            pool.map(videoDownloader.download, toDownloadVideoURLs)
         
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
-        print('### Done downloading video metadatas\n')
+        print('Done downloading video metadatas\n')
 
         ### (3) Download videos' comments
         if comment_flag:
@@ -147,15 +109,5 @@ def main(args):
 
 
 if __name__ == '__main__':
-    ## Get 'YouTube channel name' using argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--channel_id_lst', 
-        type=int,
-        nargs='+', 
-        default=list(range(1,27)),
-        help="Input CHANNEL_TABLE 'ID' values with one space"
-    )
-    
-    args = parser.parse_args(); print(f"args: {args}")
-    
-    main(args)
+    #debug()
+    main()

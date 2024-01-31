@@ -18,81 +18,34 @@ class VideoListDownloader():
         self.id = channel['id']
         self.name = channel['name']
         self.URL = channel['URL']
-        self.flag = channel['flag']
-        self.CHANNEL_TABLE = channel['CHANNEL_TABLE']
-        self.ORI_CHANNEL_TABLE = channel['ORI_CHANNEL_TABLE']
-        self.VIDEO_URL_TABLE = channel['VIDEO_URL_TABLE']
-        self.CHANNEL_FOLLOWER_CNT_TABLE = channel['CHANNEL_FOLLOWER_CNT_TABLE']
+        self.videoListPath = path_videoList + '/videoList_' + channel['name'] + '.tsv'
+        self.followerCountPath = path_followerCount + '/followerCount_' + channel['name'] + '.tsv'
         self.toUpdateVideoURLs = []
-        
-    def get_tunnel_engine(self):
-        tunnel = SSHTunnelForwarder(
-            (DB_ENV['SSH_HOST'], DB_ENV['SSH_PORT']),
-            ssh_username=DB_ENV['SSH_USER'],
-            ssh_password=DB_ENV['SSH_PASSWORD'],
-            remote_bind_address=(DB_ENV['HOST'], DB_ENV['PORT'])
-        ); tunnel.start()
-        
-        engine = create_engine(
-            f"mysql+pymysql://{DB_ENV['USER']}:{DB_ENV['PASSWORD']}@{'127.0.0.1'}:{tunnel.local_bind_port}/{DB_ENV['DATABASE']}",
-            pool_size=10, max_overflow=10
-        )
-        
-        return engine, tunnel
 
-    def save_CHANNEL_FOLLOWER_CNT_TABLE(self, engine):
-        lastDownloadTime = None
-        
+    def followerCountDownload(self):
         try:
-            lastDownloadTime = self.CHANNEL_FOLLOWER_CNT_TABLE[
-                self.CHANNEL_FOLLOWER_CNT_TABLE['CHANNEL_TABLE_ID'] == self.id
-            ].sort_values('TIME_STAMP')['TIME_STAMP'].iloc[-1]
-        except: pass
-        
-        if (lastDownloadTime == None) or lastDownloadTime + timedelta(hours=1) < datetime.now():
-            try:
-                for _, row in self.ORI_CHANNEL_TABLE.iterrows():
-                    response = requests.get(row.CHANNEL_URL, verify=False, timeout=10)
-                    startIdx = response.text.find('구독자')
-                    endIdx = response.text.find('만명', startIdx)
-                    try: follower_count = float(response.text[startIdx+4:endIdx])*10000
-                    except: continue
-                    
-                    with engine.connect() as conn:
-                        conn.execute(text(
-                            f'''INSERT INTO CHANNEL_FOLLOWER_CNT_TABLE (CHANNEL_TABLE_ID, FOLLOWER_COUNT)
-                                VALUES {row.ID, follower_count}'''
-                        )); conn.commit()
-                    
-                    print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
-                    print('Saving data to CHANNEL_FOLLOWER_CNT_TABLE DB')
-                
-            except:
-                print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')  #debug
-                print('Follower count request was time out: ' + self.id)        #debug
-                return
-                        
-    def save_VIDEO_URL_TABLE(self, engine):
-        with engine.connect() as conn:
-            for url in self.toUpdateVideoURLs:
-                conn.execute(text(
-                    f'''INSERT INTO VIDEO_URL_TABLE (CHANNEL_TABLE_ID, YOUTUBE_URL)
-                        VALUES {self.id, url[0]}'''
-                ))
-            conn.commit()
-            
+            response = requests.get(self.URL, verify=False, timeout=10)
+        except:
             print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
-            print('Saving data to VIDEO_URL_TABLE DB')
+            print('Error: Follower count request was time out: ' + self.name)
+            return
+        try:
+            startIdx = response.text.find('구독자')
+            endIdx = response.text.find('만명', startIdx)
+            follower_count = float(response.text[startIdx+4:endIdx])*10000
+        except:
+            print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
+            print('Error: Failed to parse HTML: ' + self.name)
+            return
+        with open(self.followerCountPath, 'a') as f:
+            f.write(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]') + '\t')
+            f.write(str(follower_count) + '\n')
+
 
     def download(self):
-        engine, tunnel = self.get_tunnel_engine()
-        
-        if self.flag: # 한 번에 모든 채널의 정보를 받아오므로, 한 번만 실행하도록 셋팅
-            self.save_CHANNEL_FOLLOWER_CNT_TABLE(engine)
-        
-        if self.id in self.VIDEO_URL_TABLE['CHANNEL_TABLE_ID'].unique(): # 기존 비디오 리스트 파일이 있어서 추가하면 되는 경우
+        if os.path.isfile(self.videoListPath):           # 기존 비디오 리스트 파일이 있어서 추가하면 되는 경우
             self.updatedVideoListDownload()
-        else:                                                            # 비디오 리스트를 처음부터 만드는 경우
+        else:                                   # 비디오 리스트를 처음부터 만드는 경우
             self.dateAfterVideoListDownload()
 
         #다운로드 쓰레드 실행 및 대기
@@ -103,25 +56,28 @@ class VideoListDownloader():
         thread.join()
 
         #파일에 저장
-        self.toUpdateVideoURLs.reverse()
-        self.save_VIDEO_URL_TABLE(engine)
+        with open(self.videoListPath, 'a') as f:
+            self.toUpdateVideoURLs.reverse()
+            for url in self.toUpdateVideoURLs:
+                f.write(url[0]+'\t'+url[1]+'\t'+url[2]+'\n')
         
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
-        print('{0} video URls were updated at '.format(len(self.toUpdateVideoURLs)))
+        print('{0} video URLs were updated at: '.format(len(self.toUpdateVideoURLs)) + self.name)
         
-        tunnel.stop()
 
     #기존 비디오 리스트 파일이 있는 경우의 옵션
     def updatedVideoListDownload(self):
-        pivot_df = self.VIDEO_URL_TABLE[
-            self.VIDEO_URL_TABLE['CHANNEL_TABLE_ID'] == self.id
-        ].sort_values('TIME_STAMP')
-        
-        pivotURL = pivot_df['YOUTUBE_URL'].iloc[-1]
+        with open(self.videoListPath, 'r') as f:
+            lines = f.readlines()
+            pivotURL1 = lines[-1].split('\t')[0]
+            pivotURL2 = lines[-2].split('\t')[0]
+            pivotURL3 = lines[-3].split('\t')[0]
 
         class Logger:
             def debug(self, msg):
-                if msg == '[youtube] Extracting URL: ' + pivotURL:
+                if msg == '[youtube] Extracting URL: ' + pivotURL1 or \
+                   msg == '[youtube] Extracting URL: ' + pivotURL2 or \
+                   msg == '[youtube] Extracting URL: ' + pivotURL3:
                     exit()
 
             def warning(self, msg):
