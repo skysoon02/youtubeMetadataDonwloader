@@ -92,8 +92,6 @@ def main():
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         print('Successfully donwloaded all video metadatas\n')
 
-        
-        return
 
 if __name__ == '__main__':
     #debug()
