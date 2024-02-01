@@ -117,7 +117,7 @@ pip install jsonlines
 
 ## parameter
 
-startDate: 이 날짜에 업로드 된 비디오부터 다운로드
-periodDownloadComments: 댓글을 다운로드 받을 주기. 단위는 시간(hour)
-number_of_process: 멀티프로세싱에 사용할 프로세스 수
-channels: 다운로드할 채널 목록
+startDate: 이 날짜에 업로드 된 비디오부터 다운로드  
+periodDownloadComments: 댓글을 다운로드 받을 주기. 단위는 시간(hour)  
+number_of_process: 멀티프로세싱에 사용할 프로세스 수  
+channels: 다운로드할 채널 목록  
