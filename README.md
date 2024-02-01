@@ -39,7 +39,8 @@ data/
 
 /thumbnail
 
-![Untitled](https://prod-files-secure.s3.us-west-2.amazonaws.com/a2ba7b33-6caf-42b2-a4ba-08952b584ed6/1d209d9b-aea4-42d3-a26b-9ffe2f831596/Untitled.png)
+![image](https://github.com/skysoon02/youtubeMetadataDonwloader/assets/24799966/cc624db7-0f7a-4d14-90c8-379eee2321ff)
+
 
 ```python
 thumbnail/
