@@ -3,7 +3,8 @@ from VideoListDownloader import VideoListDownloader
 from VideoDownloader import VideoDownloader
 
 import os
-from multiprocessing import Process, Pool
+import jsonlines
+from multiprocessing import Process, Pool, Queue
 from datetime import datetime, timedelta
 
 
@@ -32,46 +33,7 @@ def worker_VideoListDownloader(channel):
 
 
 def debug():
-    init()
-    lastDownloadTime = None
-
-    print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
-    print('Start downloading video metadatas\n')
-
-    toDownloadVideoURLs = []    #여러 *.txt 파일의 URL 전부 읽기
-    for channel in channels:
-        path = path_videoList + '/videoList_' + channel['name'] + '.tsv'
-        with open(path, 'r') as f:
-            lines = f.readlines()
-            for line in lines:
-                toDownloadVideoURLs.append(line.split('\t')[0])
-    
-    print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
-    print('The number of entire URLs: {0}'.format(len(toDownloadVideoURLs)))
-    
-    if lastDownloadTime == None or lastDownloadTime + timedelta(hours=periodDownloadComments) < datetime.now():
-        getCommentsOpt = True
-        lastDownloadTime = datetime.now()
-    else:
-        getCommentsOpt = False
-
-    print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
-    print('This time we will download comments too' if getCommentsOpt else 'This time we will not download comments')
-    
-    processes=[]
-    for i in range(number_of_process):
-        videoDownloader = VideoDownloader(getCommentsOpt)            
-        process = Process(target=videoDownloader.download, args=([toDownloadVideoURLs[i*len(toDownloadVideoURLs)//number_of_process : (i+1)*len(toDownloadVideoURLs)//number_of_process]]))
-        processes.append(process)
-        process.start()
-
-    for process in processes:
-        process.join()
-    
-    print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
-    print('Successfully donwloaded all video metadatas\n')
-
-    return
+    pass
 
 
 def main():
@@ -93,13 +55,13 @@ def main():
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         print('Start downloading video metadatas\n')
 
+        que = Queue()
         toDownloadVideoURLs = []    #여러 *.txt 파일의 URL 전부 읽기
         for channel in channels:
-            path = path_videoList + '/videoList_' + channel['name'] + '.tsv'
-            with open(path, 'r') as f:
-                lines = f.readlines()
-                for line in lines:
-                    toDownloadVideoURLs.append(line.split('\t')[0])
+            path = path_videoList + '/videoList_' + channel['name'] + '.jsonl'
+            with jsonlines.open(path, 'r') as f:
+                for data in f.iter():
+                    toDownloadVideoURLs.append(data['webpage_url'])
         
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         print('The number of entire URLs: {0}'.format(len(toDownloadVideoURLs)))
@@ -110,15 +72,17 @@ def main():
         else:
             getCommentsOpt = False
 
-        getCommentsOpt = False
-
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         print('This time we will download comments too' if getCommentsOpt else 'This time we will not download comments')
+                
+        que = Queue()
+        for url in toDownloadVideoURLs:
+            que.put(url)
         
         processes=[]
         for i in range(number_of_process):
             videoDownloader = VideoDownloader(getCommentsOpt)            
-            process = Process(target=videoDownloader.download, args=([toDownloadVideoURLs[i*len(toDownloadVideoURLs)//number_of_process : (i+1)*len(toDownloadVideoURLs)//number_of_process]]))
+            process = Process(target=videoDownloader.download, args=(que, ))
             processes.append(process)
             process.start()
 
@@ -129,7 +93,7 @@ def main():
         print('Successfully donwloaded all video metadatas\n')
 
         
-
+        return
 
 if __name__ == '__main__':
     #debug()

@@ -8,9 +8,7 @@ import requests
 from datetime import datetime
 import multiprocessing
 
-import codecs
-
-
+import jsonlines
 
 class VideoDownloader():
     def __init__(self, getCommentsOpt=False):
@@ -32,13 +30,15 @@ class VideoDownloader():
         }
         
         
-    def download(self, toDownloadVideoURLs):
+    def download(self, que):
         self.processName = multiprocessing.current_process().name
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         print('Start downloading video metadatas: ', self.processName)
 
-        with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
-            ydl.download(toDownloadVideoURLs)
+        while not que.empty():
+            toDownloadVideoURL = que.get()
+            with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
+                ydl.download(toDownloadVideoURL)
 
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         print('Successfully downloaded: ', self.processName)
@@ -74,25 +74,26 @@ class VideoDownloader():
 
 
     def save_CONTENT_METADATA(self, d):
-        filePath = path_metadata + '/metadata_' + d['info_dict']['id'] + '.tsv'
-        data = self.listToStr([str(d['info_dict']['id']), str(d['info_dict']['title']), 
-                f"https://i.ytimg.com/vi/{d['info_dict']['id']}/hqdefault.jpg", str(d['info_dict']['duration']), str(d['info_dict']['duration_string']), 
-                str(d['info_dict']['categories']), str(d['info_dict']['tags']), str(d['info_dict']['upload_date']), str(d['info_dict']['description'])])
+        filePath = path_metadata + '/metadata_' + d['info_dict']['id'] + '.jsonl'
+        data = {"id": d['info_dict']['id'], "title": d['info_dict']['title'], "duration": d['info_dict']['duration'],
+                "duration_string": d['info_dict']['duration_string'], "categories": d['info_dict']['categories'],
+                "tags": d['info_dict']['tags'], "upload_date": d['info_dict']['upload_date'], "description": d['info_dict']['description']}
         if not os.path.isfile(filePath):
-            with codecs.open(filePath, 'w', encoding='UTF-8-sig') as f:
+            with jsonlines.open(filePath, 'w') as f:
                 f.write(data)
         else:
-            with codecs.open(filePath, 'r', encoding='UTF-8-sig') as f:
+            with open(filePath, 'r', encoding='UTF-8-sig') as f:
                 lines = f.readlines()
-            if lines[-1] != data:
-                with codecs.open(filePath, 'w', encoding='UTF-8-sig') as f:
+                lastLine = json.loads(lines[-1])
+            if lastLine != data:
+                with jsonlines.open(filePath, 'w') as f:
                     f.write(data)
 
 
     def save_CONTENT_DETAIL(self, d):
-        filePath = path_detail + '/detail_' + d['info_dict']['id'] + '.tsv'
-        data = self.listToStr([str(d['info_dict']['view_count']), str(d['info_dict']['comment_count']), str(d['info_dict']['like_count'])])
-        with codecs.open(filePath, 'a', encoding='UTF-8-sig') as f:
+        filePath = path_detail + '/detail_' + d['info_dict']['id'] + '.jsonl'
+        data = {"view_count": d['info_dict']['view_count'], "comment_count": d['info_dict']['comment_count'], "like_count": d['info_dict']['like_count'], "mtime": datetime.now().strftime('%Y-%m-%d %H-%M-%S')}
+        with jsonlines.open(filePath, 'a') as f:
             f.write(data)
 
 
@@ -101,7 +102,6 @@ class VideoDownloader():
             response = requests.get(thumbnailURL, verify=False, timeout=10)   #썸네일 다운로드
         except:
             print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')  #debug
-            print(self.PID, end=' ')
             print('Thumbnail request was time out: ' + videoName)           #debug
             return
 
@@ -130,8 +130,8 @@ class VideoDownloader():
 
     def save_COMMENT_TABLE(self, d):
         filePath = path_comment + '/comment_' + d['info_dict']['id'] + datetime.now().strftime('_%Y-%m-%d %H-%M-%S.json')
-        with codecs.open(filePath, 'w', encoding='UTF-8-sig') as f:
-            json.dump(d['info_dict']['comments'], f, indent=4, ensure_ascii=False)
+        with open(filePath, 'w', encoding='UTF-8-sig') as f:
+            json.dump(d['info_dict']['comments'], f, ensure_ascii=False)
 
 
     def save(self, d): 

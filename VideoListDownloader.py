@@ -4,22 +4,18 @@ import os
 import yt_dlp
 import threading
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
-import pymysql
-from sqlalchemy import create_engine, text
-from sshtunnel import SSHTunnelForwarder
-
-import pandas as pd
-
+import json
+import jsonlines
 
 class VideoListDownloader():
     def __init__(self, channel):
         self.id = channel['id']
         self.name = channel['name']
         self.URL = channel['URL']
-        self.videoListPath = path_videoList + '/videoList_' + channel['name'] + '.tsv'
-        self.followerCountPath = path_followerCount + '/followerCount_' + channel['name'] + '.tsv'
+        self.videoListPath = path_videoList + '/videoList_' + channel['name'] + '.jsonl'
+        self.followerCountPath = path_followerCount + '/followerCount_' + channel['name'] + '.jsonl'
         self.toUpdateVideoURLs = []
 
     def followerCountDownload(self):
@@ -37,9 +33,8 @@ class VideoListDownloader():
             print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
             print('Error: Failed to parse HTML: ' + self.name)
             return
-        with open(self.followerCountPath, 'a') as f:
-            f.write(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]') + '\t')
-            f.write(str(follower_count) + '\n')
+        with jsonlines.open(self.followerCountPath, 'a') as f:
+            f.write({"follower": follower_count, "mtime": datetime.now().strftime('[%Y-%m-%d %H:%M:%S]')})
 
 
     def download(self):
@@ -56,10 +51,10 @@ class VideoListDownloader():
         thread.join()
 
         #파일에 저장
-        with open(self.videoListPath, 'a') as f:
+        with jsonlines.open(self.videoListPath, 'a') as f:
             self.toUpdateVideoURLs.reverse()
-            for url in self.toUpdateVideoURLs:
-                f.write(url[0]+'\t'+url[1]+'\t'+url[2]+'\n')
+            for data in self.toUpdateVideoURLs:
+                f.write(data)
         
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         print('{0} video URLs were updated at: '.format(len(self.toUpdateVideoURLs)) + self.name)
@@ -67,11 +62,11 @@ class VideoListDownloader():
 
     #기존 비디오 리스트 파일이 있는 경우의 옵션
     def updatedVideoListDownload(self):
-        with open(self.videoListPath, 'r') as f:
+        with open(self.videoListPath, 'r', encoding='UTF-8') as f:
             lines = f.readlines()
-            pivotURL1 = lines[-1].split('\t')[0]
-            pivotURL2 = lines[-2].split('\t')[0]
-            pivotURL3 = lines[-3].split('\t')[0]
+            pivotURL1 = json.loads(lines[-1])['webpage_url']
+            pivotURL2 = json.loads(lines[-2])['webpage_url']
+            pivotURL3 = json.loads(lines[-3])['webpage_url']
 
         class Logger:
             def debug(self, msg):
@@ -127,4 +122,4 @@ class VideoListDownloader():
     
     def postprocessor_hook(self, d):        
         if d['status'] == 'started':    #비디오 다운로드를 시작하는 시점. 비디오를 다운로드 하지 않더라도 실행 됨
-            self.toUpdateVideoURLs.append([d['info_dict']['webpage_url'], d['info_dict']['upload_date'], datetime.now().strftime('%Y-%m-%d %H-%M-%S')])#
+            self.toUpdateVideoURLs.append({"webpage_url": d['info_dict']['webpage_url'], "title": d['info_dict']['title'], "upload_dated": d['info_dict']['upload_date'], "mtime": datetime.now().strftime('%Y-%m-%d %H-%M-%S')})
