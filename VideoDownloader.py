@@ -74,7 +74,7 @@ class VideoDownloader():
 
 
     def save_CONTENT_METADATA(self, d):
-        filePath = path_metadata + '/metadata_' + d['info_dict']['id'] + 'tsv'
+        filePath = path_metadata + '/metadata_' + d['info_dict']['id'] + '.tsv'
         data = self.listToStr([str(d['info_dict']['id']), str(d['info_dict']['title']), 
                 f"https://i.ytimg.com/vi/{d['info_dict']['id']}/hqdefault.jpg", str(d['info_dict']['duration']), str(d['info_dict']['duration_string']), 
                 str(d['info_dict']['categories']), str(d['info_dict']['tags']), str(d['info_dict']['upload_date']), str(d['info_dict']['description'])])
@@ -90,7 +90,7 @@ class VideoDownloader():
 
 
     def save_CONTENT_DETAIL(self, d):
-        filePath = path_detail + '/detail_' + d['info_dict']['id'] + 'tsv'
+        filePath = path_detail + '/detail_' + d['info_dict']['id'] + '.tsv'
         data = self.listToStr([str(d['info_dict']['view_count']), str(d['info_dict']['comment_count']), str(d['info_dict']['like_count'])])
         with codecs.open(filePath, 'a', encoding='UTF-8-sig') as f:
             f.write(data)

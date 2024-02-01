@@ -110,6 +110,8 @@ def main():
         else:
             getCommentsOpt = False
 
+        getCommentsOpt = False
+
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         print('This time we will download comments too' if getCommentsOpt else 'This time we will not download comments')
         
