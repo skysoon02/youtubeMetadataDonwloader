@@ -144,4 +144,4 @@ def main_onlyOnce():
 
 if __name__ == '__main__':
     #debug()
-    main()
+    main_onlyOnce()
