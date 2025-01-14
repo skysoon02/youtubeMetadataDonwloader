@@ -6,6 +6,8 @@ import jsonlines
 from datetime import datetime
 import time
 
+stopFlag = False
+
 
 def startParser(videoDicts, channelName):
     file = jsonlines.open('./videoList/'+channelName+'.jsonl', 'a')
@@ -93,6 +95,7 @@ def repeatParser(videoDicts, channelName):
         file.write(videoInfo)
         
         if upload_dated == '7개월 전':
+            global stopFlag
             stopFlag = True
 
 
@@ -218,25 +221,27 @@ def repeatCode(channel, continuation):
     payload_json = json.dumps(payload, separators=(',', ':'))
     headers["content-length"] = str(len(payload_json))
 
-    with httpx.Client(http2=True) as client:
-        response = client.post(url, headers=headers, data=payload_json)
-        
-        dataDict = json.loads(response.text)
-        
-        #videoDicts: onResponseReceivedActions[0]>>appendContinuationItemsAction>>continuationItems   <-- 이거 리스트임
-        videoDicts = dataDict['onResponseReceivedActions'][0]['appendContinuationItemsAction']['continuationItems'][:-1]
+    try:    
+        with httpx.Client(http2=True) as client:
+            response = client.post(url, headers=headers, data=payload_json)
+            
+            dataDict = json.loads(response.text)
+            
+            #videoDicts: onResponseReceivedActions[0]>>appendContinuationItemsAction>>continuationItems   <-- 이거 리스트임
+            videoDicts = dataDict['onResponseReceivedActions'][0]['appendContinuationItemsAction']['continuationItems'][:-1]
 
-        #continuation: onResponseReceivedActions[0]>>appendContinuationItemsAction>>continuationItems[-1]>>continuationItemRenderer>>continuationEndpoint>>continuationCommand>>token
-        continuation = dataDict['onResponseReceivedActions'][0]['appendContinuationItemsAction']['continuationItems'][-1]['continuationItemRenderer']['continuationEndpoint']['continuationCommand']['token']
+            #continuation: onResponseReceivedActions[0]>>appendContinuationItemsAction>>continuationItems[-1]>>continuationItemRenderer>>continuationEndpoint>>continuationCommand>>token
+            continuation = dataDict['onResponseReceivedActions'][0]['appendContinuationItemsAction']['continuationItems'][-1]['continuationItemRenderer']['continuationEndpoint']['continuationCommand']['token']
 
-        repeatParser(videoDicts, channelName)
-    return continuation
+            repeatParser(videoDicts, channelName)
+        return continuation
+    except Exception as e:
+        print(response.text)
+        print(e)
 
-
-stopFlag = False
 
 for channel in channels:
-    stopFalg = False
+    stopFlag = False
     continuation = startCode(channel)
     while stopFlag == False:
         continuation = repeatCode(channel, continuation)
