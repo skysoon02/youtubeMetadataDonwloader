@@ -10,7 +10,7 @@ stopFlag = False
 
 
 def startParser(videoDicts, channelName):
-    file = jsonlines.open('./videoList/'+channelName+'.jsonl', 'a')
+    file = jsonlines.open('./videoList/videoList_'+channelName+'.jsonl', 'a')
     for videoDict in videoDicts:
         #id: richItemRenderer>>content>>videoRenderer>>videoId
         webpage_url = 'https://www.youtube.com/watch?v=' + videoDict['richItemRenderer']['content']['videoRenderer']['videoId']
