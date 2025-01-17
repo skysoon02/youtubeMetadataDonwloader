@@ -9,7 +9,6 @@ def addChannelToMetadata():
         with jsonlines.open(videoListPath, 'r') as f:
             for video in f.iter():
                 metadataPath = path_metadata+'/metadata_'+video['webpage_url'][-11:]+'.jsonl'
-                print(metadataPath)
                 if os.path.isfile(metadataPath):
                     data = None
                     with open(metadataPath, 'r', encoding='UTF-8-sig') as file:
@@ -18,3 +17,5 @@ def addChannelToMetadata():
                     data['channelName'] = channel['name']
                     with open(metadataPath, 'w') as file:
                         json.dump(data, file)
+
+addChannelToMetadata()
