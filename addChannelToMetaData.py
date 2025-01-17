@@ -15,8 +15,8 @@ def addChannelToMetadata():
                         data = json.load(file)
                     data['channelId'] = channel['id']
                     data['channelName'] = channel['name']
-                    with open(metadataPath, 'w') as file:
-                        json.dump(data, file)
+                    with jsonlines.open(metadataPath, 'w') as file:  #jsonlines is used for encoding 
+                        file.write(data)
 
 if __name__ == '__main__':
     addChannelToMetadata()
