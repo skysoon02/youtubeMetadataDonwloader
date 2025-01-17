@@ -18,4 +18,5 @@ def addChannelToMetadata():
                     with open(metadataPath, 'w') as file:
                         json.dump(data, file)
 
-addChannelToMetadata()
+if __name__ == '__main__':
+    addChannelToMetadata()
