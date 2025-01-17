@@ -1,6 +1,8 @@
 from config import *
 from VideoListDownloader import VideoListDownloader
 from VideoDownloader import VideoDownloader
+from videoListDownloaderRequests import videoListDownloaderRequests
+from addChannelToMetaData import addChannelToMetadata
 
 import os
 import jsonlines
@@ -101,8 +103,9 @@ def main_onlyOnce():
     print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
     print('Start downloading video URLs\n')
     
-    with Pool(number_of_process) as pool:
-        pool.map(worker_VideoListDownloader, channels)
+    # with Pool(number_of_process) as pool:
+    #     pool.map(worker_VideoListDownloader, channels)
+    videoListDownloaderRequests()   #use videoListDonwloaderRequests instead of videoListDownloader because of the error of yt-dlp
         
     print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
     print('Successfully downloaded all video URLs\n')
@@ -138,6 +141,9 @@ def main_onlyOnce():
     
     print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
     print('Successfully donwloaded all video metadatas\n')
+
+    ### (3) Add channel info to videos' metadatas
+    addChannelToMetadata()
 
 
 

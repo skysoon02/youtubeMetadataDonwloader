@@ -10,7 +10,7 @@ stopFlag = False
 
 
 def startParser(videoDicts, channelName):
-    file = jsonlines.open('./videoList/videoList_'+channelName+'.jsonl', 'a')
+    file = jsonlines.open(path_videoList + '/videoList_' + channelName + '.jsonl', 'a')
     for videoDict in videoDicts:
         #id: richItemRenderer>>content>>videoRenderer>>videoId
         webpage_url = 'https://www.youtube.com/watch?v=' + videoDict['richItemRenderer']['content']['videoRenderer']['videoId']
@@ -82,7 +82,7 @@ def startCode(channel):
 
 
 def repeatParser(videoDicts, channelName):
-    file = jsonlines.open('./videoList/'+channelName+'.jsonl', 'a')
+    file = jsonlines.open(path_videoList + '/videoList_' + channelName + '.jsonl', 'a')
     for videoDict in videoDicts:
         #id: richItemRenderer>>content>>videoRenderer>>videoId
         webpage_url = 'https://www.youtube.com/watch?v=' + videoDict['richItemRenderer']['content']['videoRenderer']['videoId']
@@ -240,9 +240,10 @@ def repeatCode(channel, continuation):
         print(e)
 
 
-for channel in channels:
-    stopFlag = False
-    continuation = startCode(channel)
-    while stopFlag == False:
-        continuation = repeatCode(channel, continuation)
-        time.sleep(1)
+def videoListDownloaderRequests():
+    for channel in channels:
+        stopFlag = False
+        continuation = startCode(channel)
+        while stopFlag == False:
+            continuation = repeatCode(channel, continuation)
+            time.sleep(1)
