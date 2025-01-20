@@ -94,7 +94,7 @@ def repeatParser(videoDicts, channelName):
         videoInfo = {"webpage_url": webpage_url, "title": title, "upload_dated": upload_dated, "mtime": datetime.now().strftime("%Y-%m-%d %H-%M-%S")}
         file.write(videoInfo)
         
-        if upload_dated == '7개월 전':
+        if upload_dated == '1년 전':
             global stopFlag
             stopFlag = True
 
@@ -247,3 +247,7 @@ def videoListDownloaderRequests():
         while stopFlag == False:
             continuation = repeatCode(channel, continuation)
             time.sleep(1)
+
+
+if __name__ == '__main__':
+    videoListDownloaderRequests()
